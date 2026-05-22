@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stealth Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #222; margin: 0; display: flex; justify-content: center; padding-top: 50px; }
+        #chat-box { width: 400px; background: #fff; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; height: 600px; }
+        #messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message { padding: 12px 16px; border-radius: 15px; max-width: 75%; word-wrap: break-word; font-size: 15px; }
+        .received { background: #e9ecef; align-self: flex-start; color: black; }
+        .stealth-mode { text-align: center; background: transparent; cursor: pointer; font-size: 40px; line-height: 1; }
+        .unlock-btn { font-size: 12px; color: #007bff; display: block; margin-top: 5px; font-family: sans-serif; font-weight: bold; }
+        #input-area { display: flex; padding: 15px; background: #f8f9fa; border-top: 1px solid #ddd; }
+        input[type="text"] { flex-grow: 1; padding: 10px 15px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        button { background: #0084ff; color: white; border: none; padding: 10px 20px; margin-left: 10px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="chat-box">
+    <div id="messages"></div>
+    <div id="input-area">
+        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    // 1. Dial the server's open WebSocket phone line
+    const ws = new WebSocket("ws://localhost:8000/ws");
+    const messagesDiv = document.getElementById("messages");
+    const secretPin = "0000"; // Your security PIN
+
+    // 2. What to do when a message arrives from the server
+    ws.onmessage = function(event) {
+        const originalText = event.data;
+        
+        // Create the message bubble
+        const msgElement = document.createElement("div");
+        msgElement.classList.add("message", "received");
+        msgElement.innerText = originalText;
+        messagesDiv.appendChild(msgElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        // 3. The Stealth Mechanic: Wait 2 seconds, then mask it
+        setTimeout(() => {
+            maskMessage(msgElement, originalText);
+        }, 2000);
+    };
+
+    // 4. The Masking Function
+    function maskMessage(element, text) {
+        element.innerHTML = "👻<br><span class='unlock-btn'>Unlock</span>";
+        element.classList.add("stealth-mode");
+
+        // What happens when they click the sticker to unlock it
+        element.onclick = function() {
+            const userPin = prompt("Enter PIN to view hidden message:");
+            if (userPin === secretPin) {
+                // Reveal the text!
+                element.innerText = text;
+                element.classList.remove("stealth-mode");
+                element.onclick = null; 
+
+                // Hide it again after 2 seconds
+                setTimeout(() => {
+                    maskMessage(element, text);
+                }, 2000);
+            } else if (userPin !== null) {
+                alert("Access Denied: Incorrect PIN");
+            }
+        };
+    }
+
+    // 5. Sending the message to the server
+    function sendMessage() {
+        const input = document.getElementById("messageInput");
+        if (input.value.trim() !== "") {
+            ws.send(input.value);
+            input.value = ""; // Clear the typing box
+        }
+    }
+
+    // Allow hitting the "Enter" key to send
+    document.getElementById("messageInput").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") sendMessage();
+    });
+</script>
+</body>
+</html>
