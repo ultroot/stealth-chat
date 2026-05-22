@@ -27,7 +27,7 @@
 
 <script>
     // 1. Dial the server's open WebSocket phone line
-    const ws = new WebSocket("ws://localhost:8000/ws");
+    const ws = new WebSocket("ws://" + window.location.host + "/ws");
     const messagesDiv = document.getElementById("messages");
     const secretPin = "0000"; // Your security PIN
 

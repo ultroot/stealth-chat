@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from typing import List
 
 app = FastAPI()
@@ -22,7 +23,7 @@ manager = ConnectionManager()
 
 @app.get("/")
 def read_root():
-    return {"status": "Stealth Chat Engine is Online"}
+    return FileResponse("index.html")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
