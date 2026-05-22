@@ -6,37 +6,26 @@
         /* WhatsApp Theme Colors and Layout */
         body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background: #ece5dd; margin: 0; display: flex; justify-content: center; height: 100vh; align-items: center; }
         #chat-box { width: 100%; max-width: 450px; background: #efeae2; height: 100vh; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
-        /* Header */
-        #chat-header { background: #00a884; color: white; padding: 15px 20px; font-weight: bold; font-size: 18px; display: flex; align-items: center; }
-        
-        /* Message Area */
+        #chat-header { background: #00a884; color: white; padding: 15px 20px; font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: space-between; }
         #messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        
-        /* Bubbles */
         .message { padding: 8px 12px; border-radius: 8px; max-width: 75%; word-wrap: break-word; font-size: 15px; position: relative; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
         .sent { background: #d9fdd3; align-self: flex-end; border-top-right-radius: 0; }
         .received { background: #ffffff; align-self: flex-start; border-top-left-radius: 0; }
-        
-        /* Stealth Mode Styling */
         .stealth-mode { text-align: center; background: transparent; box-shadow: none; cursor: pointer; font-size: 40px; line-height: 1; }
         .unlock-btn { font-size: 12px; color: #007bff; display: block; margin-top: 5px; font-family: sans-serif; font-weight: bold; }
-        
-        /* Input Area */
         #input-area { display: flex; padding: 10px; background: #f0f2f5; align-items: center; }
         input[type="text"] { flex-grow: 1; padding: 12px 15px; border: none; border-radius: 20px; outline: none; font-size: 15px; background: #ffffff; }
         button { background: #00a884; color: white; border: none; padding: 12px 20px; margin-left: 10px; border-radius: 20px; cursor: pointer; font-weight: bold; }
-        
-        /* Make it look like a phone app on larger screens */
-        @media (min-width: 500px) {
-            #chat-box { height: 90vh; border-radius: 10px; overflow: hidden; }
-        }
+        @media (min-width: 500px) { #chat-box { height: 90vh; border-radius: 10px; overflow: hidden; } }
     </style>
 </head>
 <body>
 
 <div id="chat-box">
-    <div id="chat-header">Stealth Chat</div>
+    <div id="chat-header">
+        <span>Stealth Chat</span>
+        <span id="room-display" style="font-size: 12px; opacity: 0.8;"></span>
+    </div>
     <div id="messages"></div>
     <div id="input-area">
         <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
@@ -45,34 +34,37 @@
 </div>
 
 <script>
-    // 1. Ask user to set their PIN immediately when the page loads
-    let secretPin = prompt("Welcome to Stealth Chat! Set your secret PIN for this session:", "1234");
-    if (!secretPin) secretPin = "1234"; // Default fallback if they click cancel
+    // 1. Separate Prompts for Room, Nickname, and PIN
+    let roomName = prompt("1. Enter a Chat Room Name (You and your friend must type the exact same name to connect):", "SecretRoom");
+    if (!roomName) roomName = "SecretRoom";
 
-    // 2. Generate a random ID so the browser knows who "I" am
+    let myNickname = prompt("2. Enter your Nickname (This will show under your ghost emojis):", "Agent");
+    if (!myNickname) myNickname = "Agent";
+
+    let secretPin = prompt("3. Set your secret PIN to unlock messages:", "1234");
+    if (!secretPin) secretPin = "1234";
+
+    // Display the room name in the top right corner
+    document.getElementById("room-display").innerText = "Room: " + roomName;
+
     const myId = Math.random().toString(36).substring(2, 10);
-
-    // 3. Dial the server dynamically
-    const ws = new WebSocket("ws://" + window.location.host + "/ws");
+    
+    // Connect specifically to the private room
+    const ws = new WebSocket("ws://" + window.location.host + "/ws/" + encodeURIComponent(roomName));
     const messagesDiv = document.getElementById("messages");
-
-    // Array of random ghost/disguise emojis
     const disguises = ["👻", "👽", "👾", "🤖", "🎃", "🙈", "🕵️‍♂️", "🔒"];
 
     ws.onmessage = function(event) {
         let data;
         try {
-            // Try to read the message as a JSON package
             data = JSON.parse(event.data);
         } catch (e) {
-            // If someone on the old version sends plain text, catch it so it doesn't break
-            data = { senderId: "unknown", text: event.data };
+            data = { senderId: "unknown", nickname: "Unknown", text: event.data };
         }
         
         const msgElement = document.createElement("div");
         msgElement.classList.add("message");
 
-        // Logic: If I sent it, put it on the right. If they sent it, put it on the left.
         if (data.senderId === myId) {
             msgElement.classList.add("sent");
         } else {
@@ -83,17 +75,17 @@
         messagesDiv.appendChild(msgElement);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
-        // Wait 5 seconds, then mask it
+        // Pass the specific sender's nickname to the masking function
         setTimeout(() => {
-            maskMessage(msgElement, data.text);
+            maskMessage(msgElement, data.text, data.nickname);
         }, 5000);
     };
 
-    function maskMessage(element, text) {
-        // Pick a random emoji from our list
+    function maskMessage(element, text, senderNickname) {
         const randomEmoji = disguises[Math.floor(Math.random() * disguises.length)];
 
-        element.innerHTML = randomEmoji + "<br><span class='unlock-btn'>Unlock</span>";
+        // Display the user's nickname instead of "Unlock"
+        element.innerHTML = randomEmoji + "<br><span class='unlock-btn'>" + senderNickname + "</span>";
         element.classList.add("stealth-mode");
 
         element.onclick = function() {
@@ -103,8 +95,9 @@
                 element.classList.remove("stealth-mode");
                 element.onclick = null; 
 
+                // Hide it again and re-apply the correct nickname
                 setTimeout(() => {
-                    maskMessage(element, text);
+                    maskMessage(element, text, senderNickname);
                 }, 5000);
             } else if (userPin !== null) {
                 alert("Incorrect PIN");
@@ -115,12 +108,12 @@
     function sendMessage() {
         const input = document.getElementById("messageInput");
         if (input.value.trim() !== "") {
-            // Package the text and our ID into a JSON object
+            // Send the nickname alongside the message
             const payload = {
                 senderId: myId,
+                nickname: myNickname,
                 text: input.value
             };
-            // Turn it into a string and send it
             ws.send(JSON.stringify(payload));
             input.value = "";
         }
