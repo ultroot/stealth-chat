@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI-CD Pipeline
 
 on:
   push:
@@ -13,19 +13,6 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set Up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt
-
-      - name: Verify Python Syntax
-        run: |
-          python -m py_compile main.py
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -39,3 +26,25 @@ jobs:
       - name: Push Docker Image
         run: |
           docker push ultroot/stealth-chat:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull ultroot/stealth-chat:latest
+
+            docker stop stealth-chat || true
+            docker rm stealth-chat || true
+
+            docker run -d \
+              --name stealth-chat \
+              -p 8000:8000 \
+              ultroot/stealth-chat:latest
