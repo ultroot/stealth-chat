@@ -6,14 +6,14 @@ on:
       - main
 
 jobs:
-  build-and-test:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set Up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -26,6 +26,16 @@ jobs:
         run: |
           python -m py_compile main.py
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build Docker Image
         run: |
-          docker build -t stealth-chat .
+          docker build -t ultroot/stealth-chat:latest .
+
+      - name: Push Docker Image
+        run: |
+          docker push ultroot/stealth-chat:latest
